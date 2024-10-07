@@ -1,0 +1,7 @@
+dkim.key
+dkim.pub.key
+postfix/main.cf
+postfix/pgsql-relay-domains.cf
+postfix/pgsql-transport-maps.cf
+.env
+simplelogin.env
