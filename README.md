@@ -13,5 +13,8 @@ You need to have Docker Compose installed.
 3. Add the DNS records suggested by the output
 4. Configure a HTTPS proxy to http://10.0.0.3:7777
 
+NOTE: build.sh should only be run once, otherwise it will overwrite the postgres password and dkim key.
+After the first build use docker compose commands to bring the stack up and down.
+
 ## Known Issues
 * Quarantined emails are not stored, the .eml files give a 404
