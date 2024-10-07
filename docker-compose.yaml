@@ -1,0 +1,89 @@
+services:
+  postfix:
+    hostname: sl-postfix
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM debian:bookworm-slim
+        RUN apt update && apt install -y postfix postfix-pgsql && rm -rf /var/cache/apt/*
+        EXPOSE 25/tcp
+        COPY postfix/main.cf postfix/pgsql-relay-domains.cf postfix/pgsql-transport-maps.cf postfix/init.sh /etc/postfix/
+        RUN ["bash", "/etc/postfix/init.sh"]
+        CMD ["/usr/sbin/postfix", "start-fg"]
+    ports:
+      - 25:25
+    networks:
+      sl-network:
+        ipv4_address: 10.0.0.2
+
+  sl-db:
+    hostname: sl-db
+    image: postgres:12.1
+    restart: always
+    volumes:
+      - /persistent/sl-db:/var/lib/postgresql/data
+    environment:
+      - "POSTGRES_USER=${POSTGRES_USER}"
+      - "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+      - "POSTGRES_DB=simplelogin"
+    networks:
+      sl-network:
+        ipv4_address: 10.0.0.3
+
+  sl-app:
+    hostname: sl-app
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM simplelogin/app:3.4.0
+        COPY simplelogin.env /code/.env
+        COPY dkim.key dkim.pub.key /
+    restart: always
+    volumes:
+      - /persistent/sl:/sl
+      - /persistent/sl-upload:/code/static/upload
+    networks:
+      sl-network:
+        ipv4_address: 10.0.0.4
+
+  sl-email:
+    hostname: sl-email
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM simplelogin/app:3.4.0
+        COPY simplelogin.env /code/.env
+        COPY dkim.key dkim.pub.key /
+    restart: always
+    volumes:
+      - /persistent/sl:/sl
+      - /persistent/sl/upload:/code/static/upload
+    command: "python email_handler.py"
+    networks:
+      sl-network:
+        ipv4_address: 10.0.0.5
+
+  sl-job-unner:
+    hostname: sl-job-runner
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM simplelogin/app:3.4.0
+        COPY simplelogin.env /code/.env
+        COPY dkim.key dkim.pub.key /
+    restart: always
+    volumes:
+      - /persistent/sl:/sl
+      - /persistent/sl/upload:/code/static/upload
+    networks:
+      sl-network:
+        ipv4_address: 10.0.0.6
+    command: "python job_runner.py"
+
+networks:
+  sl-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/24
